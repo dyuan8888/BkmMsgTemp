@@ -1,20 +1,18 @@
 from selenium import webdriver
 import requests
 import os
+import json
 
-'''Use selenium to log in to the system and keep the session for other web page visit'''
 
-
+with open('account.json') as fb:
+    account = json.load(fb)
 url="http://bkm.amecnsh.com/bkm/index.php/login/login.html"
 bkm_url = 'http://bkm.amecnsh.com/bkm/index.php/index/inprocess.html'
+data = {'username':account['user'], 'password':account['pwd']}
 
-def login(url, username, password):
-    '''Log in to the system
-    url: web url
-    username:
-    password:
-    return: browser
-    '''  
+
+def auto_login():
+    '''Use selenium to log in to the system and keep the session for other web page visit'''  
     options = webdriver.FirefoxOptions()
     options.add_argument('-headless') 
     options.add_argument('--disable-gpu')
@@ -33,30 +31,46 @@ def get_cookie(browser):
     browser.close()
     return cookies
 
-def update_session(cookies):
+
+def update_session(ses,cookies):
     '''update the session with new cookies'''
     c = requests.cookies.RequestsCookieJar() 
     for item in cookies:
         c.set(item["name"],item["value"])
-    ses = requests.Session()
     ses.cookies.update(c)
     return ses
 
+
 def visit_webpage(ses, url):
     '''visit any webpages with session alive'''
-    page_text = ses.get(url=url).text
+    return ses.get(url=url).text
+    
+
+def save_cookies(cookies):
+    with open('cookies.json', 'w') as fb:
+        json.dump(cookies, fb)
+
+
+def load_cookies():
+    with open('cookies.json') as fb:
+        return json.load(fb)
+    
+
+def get_page_text():    
+    ses = requests.session()
+    ses.post(url=url, data=data)  # log in    
+    cookies = load_cookies()  # load the pre-saved cookies
+    ses = update_session(ses,cookies)   # update the session
+    page_text = visit_webpage(ses, bkm_url) # continue to visit other webpages with this session
+    if username not in page_text:
+        browser = auto_login()  # login
+        cookies = get_cookie(browser)  # get cookies
+        save_cookies(cookies)
+        ses = update_session(ses,cookies)   # update the session
+        page_text = visit_webpage(ses, bkm_url)
+
     return page_text
 
 
-
-def main():
-    username= os.getenv('username')
-    password= os.getenv('password')
-    browser = login(url, username, password)  # login
-    cookies = get_cookie(browser)  # get cookies
-    ses = update_session(cookies)   # update the session
-    page_text = visit_webpage(ses, bkm_url) # continue to visit other webpages with this session
-    print(page_text)
-
 if __name__ == '__main__':
-    main()
+    get_page_text()
